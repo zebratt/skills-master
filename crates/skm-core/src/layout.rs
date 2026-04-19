@@ -67,6 +67,12 @@ impl Layout {
     pub fn backups_dir(&self) -> PathBuf {
         self.manager_dir().join(BACKUPS_SUBDIR)
     }
+
+    /// User-editable config file — per-tool mode overrides, etc.
+    /// Absent by default; `Config::load` treats missing as empty.
+    pub fn config_path(&self) -> PathBuf {
+        self.manager_dir().join("config.yaml")
+    }
 }
 
 #[cfg(test)]

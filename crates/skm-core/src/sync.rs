@@ -14,6 +14,7 @@
 //! `--dry-run` computes the outcome without touching the filesystem or
 //! state.json.
 
+use crate::config::Config;
 use crate::error::{SkmError, SkmResult};
 use crate::frontmatter::{parse_skill_md, skill_md_path, Tools};
 use crate::init::ensure_initialized;
@@ -80,6 +81,7 @@ pub fn run(layout: &Layout, home: &Path, dry_run: bool) -> SkmResult<SyncOutcome
     ensure_initialized(layout)?;
 
     let mut state = load(&layout.manager_dir(), &layout.skills_root())?;
+    let config = Config::load(&layout.manager_dir())?;
     let skills_root = layout.skills_root();
 
     let disk_skills = list_skill_dirs(&skills_root)?;
@@ -149,8 +151,35 @@ pub fn run(layout: &Layout, home: &Path, dry_run: bool) -> SkmResult<SyncOutcome
                 continue;
             }
 
-            match tool.mode() {
+            match config.mode_for(*tool) {
                 Mode::SourceConsumer => {
+                    // If we previously created a symlink for this tool (prior
+                    // config said Distribute), retire it — the tool now reads
+                    // skills_root directly and the symlink is obsolete.
+                    if let Some(old) = prior.get(tool.name()) {
+                        if matches!(old.mode, DistributionMode::Symlink) {
+                            let target = PathBuf::from(&old.path);
+                            match retire_symlink(&target, &skill_dir, dry_run) {
+                                Retire::Removed => cells.push(SyncCell {
+                                    skill: skill.clone(),
+                                    tool: tool.name().into(),
+                                    action: SyncAction::RemovedStale {
+                                        target: target.clone(),
+                                    },
+                                }),
+                                Retire::NotOurs => cells.push(SyncCell {
+                                    skill: skill.clone(),
+                                    tool: tool.name().into(),
+                                    action: SyncAction::Conflict {
+                                        target: target.clone(),
+                                        reason: "prior symlink no longer ours; left in place"
+                                            .into(),
+                                    },
+                                }),
+                                Retire::Absent => {}
+                            }
+                        }
+                    }
                     new_distribution.insert(
                         tool.name().into(),
                         DistributionRecord {
@@ -534,6 +563,56 @@ mod tests {
         // good still got synced.
         let c = cell(&out, "good", "claude");
         assert!(matches!(c.action, SyncAction::CreateSymlink { .. }));
+    }
+
+    #[test]
+    fn config_override_flips_codex_to_source_consumer() {
+        let (_tmp, layout, home) = setup();
+        write_skill(&layout, "foo", "[codex]");
+        fs::write(
+            layout.manager_dir().join("config.yaml"),
+            "tool_modes:\n  codex: source-consumer\n",
+        )
+        .unwrap();
+
+        let out = run(&layout, &home, false).unwrap();
+        let c = cell(&out, "foo", "codex");
+        assert!(matches!(c.action, SyncAction::RecordSourceConsumer));
+
+        // No symlink at ~/.codex/skills/foo.
+        let target = Tool::Codex.dist_path(&home, "foo").unwrap();
+        assert!(fs::symlink_metadata(&target).is_err());
+    }
+
+    #[test]
+    fn switching_distribute_to_source_consumer_retires_old_symlink() {
+        let (_tmp, layout, home) = setup();
+        write_skill(&layout, "foo", "[codex]");
+
+        // Round 1: default mode = Distribute → symlink created.
+        run(&layout, &home, false).unwrap();
+        let target = Tool::Codex.dist_path(&home, "foo").unwrap();
+        assert!(fs::symlink_metadata(&target)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+
+        // Round 2: user flips codex to source-consumer in config.yaml.
+        fs::write(
+            layout.manager_dir().join("config.yaml"),
+            "tool_modes:\n  codex: source-consumer\n",
+        )
+        .unwrap();
+
+        let out = run(&layout, &home, false).unwrap();
+        // Expect one cell reporting the removal, one recording source-consumer.
+        let removed = out.cells.iter().any(|c| {
+            c.skill == "foo"
+                && c.tool == "codex"
+                && matches!(c.action, SyncAction::RemovedStale { .. })
+        });
+        assert!(removed, "expected RemovedStale cell for codex/foo");
+        assert!(fs::symlink_metadata(&target).is_err());
     }
 
     #[test]
