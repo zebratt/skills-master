@@ -1,0 +1,74 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            cross: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: install cross (linux arm64)
+        if: matrix.cross == true
+        run: cargo install cross --locked
+      - name: build
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }} -p skm-cli
+          else
+            cargo build --release --target ${{ matrix.target }} -p skm-cli
+          fi
+      - name: package
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/skm dist/skm
+          cp README.md LICENSE dist/
+          cd dist
+          tar czf ../skm-${{ matrix.target }}.tar.gz *
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skm-${{ matrix.target }}
+          path: skm-${{ matrix.target }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: skm-*
+          merge-multiple: true
+          path: dist
+      - name: checksums
+        run: cd dist && sha256sum *.tar.gz > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          generate_release_notes: true
+
+  # TODO Phase 1.5: add homebrew-tap bump job after release is published

@@ -1,0 +1,18 @@
+[package]
+name = "skm-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Core library for SkillsMaster (skm): frontmatter, state, distribution, error types"
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+serde_yaml.workspace = true
+serde_json.workspace = true
+fs2.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

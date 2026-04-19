@@ -1,0 +1,12 @@
+[package]
+name = "skm-test-utils"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Test fixtures and utilities for skm integration tests"
+
+[dependencies]
+skm-core = { path = "../skm-core" }
+tempfile.workspace = true
