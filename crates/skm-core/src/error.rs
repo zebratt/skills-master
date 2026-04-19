@@ -8,7 +8,9 @@ pub enum SkmError {
     #[error("state.json is corrupt and backup unreadable: {0}")]
     StateCorrupted(String),
 
-    #[error("could not acquire state lock within {timeout_secs}s (another skm process may be running)")]
+    #[error(
+        "could not acquire state lock within {timeout_secs}s (another skm process may be running)"
+    )]
     LockTimeout { timeout_secs: u64 },
 
     #[error("frontmatter at {path:?} is invalid: {reason}")]

@@ -33,7 +33,10 @@ pub struct State {
 
 impl State {
     pub fn new() -> Self {
-        Self { version: 1, skills: BTreeMap::new() }
+        Self {
+            version: 1,
+            skills: BTreeMap::new(),
+        }
     }
 }
 

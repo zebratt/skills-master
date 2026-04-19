@@ -64,7 +64,12 @@ fn main() -> Result<()> {
         Cmd::Status => {
             anyhow::bail!("status: not yet implemented (Phase 1, json={})", cli.json)
         }
-        Cmd::Import { path, r#as, strict, force } => {
+        Cmd::Import {
+            path,
+            r#as,
+            strict,
+            force,
+        } => {
             anyhow::bail!(
                 "import: not yet implemented (Phase 1, path={path}, as={:?}, strict={strict}, force={force})",
                 r#as

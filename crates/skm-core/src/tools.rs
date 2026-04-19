@@ -25,10 +25,18 @@ impl Tool {
 
     pub fn distribution(self) -> Distribution {
         match self {
-            Tool::Claude => Distribution::Symlink { dir: "~/.claude/skills" },
-            Tool::Codex => Distribution::Symlink { dir: "~/.codex/skills" },
-            Tool::Openclaw => Distribution::Symlink { dir: "~/.openclaw/skills" },
-            Tool::Hermes => Distribution::SourceConsumer { source: "~/.agents/skills" },
+            Tool::Claude => Distribution::Symlink {
+                dir: "~/.claude/skills",
+            },
+            Tool::Codex => Distribution::Symlink {
+                dir: "~/.codex/skills",
+            },
+            Tool::Openclaw => Distribution::Symlink {
+                dir: "~/.openclaw/skills",
+            },
+            Tool::Hermes => Distribution::SourceConsumer {
+                source: "~/.agents/skills",
+            },
         }
     }
 }
