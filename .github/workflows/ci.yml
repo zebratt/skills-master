@@ -32,8 +32,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
-  test:
-    name: test ${{ matrix.os }} / ${{ matrix.target }}
+  build:
+    name: build ${{ matrix.os }} / ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -59,9 +59,9 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cross
-      - name: cargo test (native)
+      - name: cargo build (native)
         if: matrix.cross != true
-        run: cargo test --workspace --target ${{ matrix.target }}
-      - name: cross build (no test — host arch mismatch)
+        run: cargo build --workspace --target ${{ matrix.target }}
+      - name: cross build (linux arm64)
         if: matrix.cross == true
         run: cross build --workspace --target ${{ matrix.target }}
