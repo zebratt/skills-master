@@ -18,15 +18,23 @@ use crate::error::{SkmError, SkmResult};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+/// Top-level SKILL.md frontmatter. Unknown fields are tolerated so we can
+/// coexist with Claude Code's `allowed-tools` and other upstream conventions.
+/// Missing `tools` defaults to `all` — the friendly choice, since distribution
+/// to a tool is just a symlink with no runtime cost.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Frontmatter {
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(default = "default_tools_all")]
     pub tools: Tools,
     #[serde(default)]
     pub upstream: Option<Upstream>,
+}
+
+fn default_tools_all() -> Tools {
+    Tools::All(AllMarker::All)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -255,15 +263,28 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_field() {
+    fn tolerates_unknown_top_level_field() {
+        // Claude Code SKILL.md files carry `allowed-tools:` — we must not reject them.
         let tmp = tempdir().unwrap();
         let path = write_skill(
             tmp.path(),
             "extra",
-            "---\nname: extra\ntools: [claude]\nbogus: 1\n---\n",
+            "---\nname: extra\ntools: [claude]\nallowed-tools: Bash(ls:*)\nbogus: 1\n---\n",
         );
-        let err = parse_skill_md(&path).unwrap_err();
-        assert!(matches!(err, SkmError::FrontmatterInvalid { .. }));
+        let fm = parse_skill_md(&path).unwrap();
+        assert_eq!(fm.name, "extra");
+    }
+
+    #[test]
+    fn missing_tools_defaults_to_all() {
+        let tmp = tempdir().unwrap();
+        let path = write_skill(
+            tmp.path(),
+            "notools",
+            "---\nname: notools\ndescription: hi\n---\n# body\n",
+        );
+        let fm = parse_skill_md(&path).unwrap();
+        assert!(matches!(fm.tools, Tools::All(AllMarker::All)));
     }
 
     #[test]

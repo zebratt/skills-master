@@ -17,6 +17,7 @@
 //!
 //! `status` never writes. Drift repairs are a `doctor` job (Phase 1.5).
 
+use crate::config::Config;
 use crate::error::SkmResult;
 use crate::frontmatter::{parse_skill_md, skill_md_path, Frontmatter, Tools};
 use crate::init::ensure_initialized;
@@ -77,6 +78,7 @@ pub fn run(layout: &Layout, home: &Path) -> SkmResult<StatusReport> {
     ensure_initialized(layout)?;
 
     let state = load(&layout.manager_dir(), &layout.skills_root())?;
+    let config = Config::load(&layout.manager_dir())?;
 
     let mut skills: Vec<SkillStatus> = Vec::new();
     for skill_name in list_skill_dirs(&layout.skills_root())? {
@@ -93,7 +95,8 @@ pub fn run(layout: &Layout, home: &Path) -> SkmResult<StatusReport> {
         match parse_result {
             Ok(fm) => {
                 let requested = requested_tools(&fm);
-                let tools = compute_tool_statuses(&skill_name, &skill_dir, home, &requested);
+                let tools =
+                    compute_tool_statuses(&skill_name, &skill_dir, home, &requested, &config);
                 skills.push(SkillStatus {
                     name: skill_name,
                     origin,
@@ -168,13 +171,14 @@ fn compute_tool_statuses(
     skill_dir: &Path,
     home: &Path,
     requested: &[Tool],
+    config: &Config,
 ) -> BTreeMap<String, ToolStatus> {
     let mut out = BTreeMap::new();
     for tool in Tool::all() {
         let status = if !requested.contains(tool) {
             ToolStatus::NotRequested
         } else {
-            match tool.mode() {
+            match config.mode_for(*tool) {
                 Mode::SourceConsumer => ToolStatus::SourceConsumer,
                 Mode::Distribute => {
                     let target = tool
