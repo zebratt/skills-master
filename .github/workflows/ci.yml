@@ -54,9 +54,14 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
+      - name: install cross
+        if: matrix.cross == true
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
       - name: cargo test (native)
         if: matrix.cross != true
         run: cargo test --workspace --target ${{ matrix.target }}
-      - name: cargo build (cross, no test)
+      - name: cross build (no test — host arch mismatch)
         if: matrix.cross == true
-        run: cargo build --workspace --target ${{ matrix.target }}
+        run: cross build --workspace --target ${{ matrix.target }}
